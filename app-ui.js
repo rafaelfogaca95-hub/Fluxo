@@ -2073,7 +2073,7 @@ async function aplicarConvite(convite, automatico){
 /* Convite recebido por link (https://site/#convite=...) */
 function conviteDaUrl(){
   const sync = window.FluxoSync;
-  if (!sync || sync.isConfigured()) return;
+  if (!sync) return;
 
   const m = (location.hash || '').match(/convite=([^&\s]+)/);
   if (!m) return;
@@ -2085,6 +2085,10 @@ function conviteDaUrl(){
   if (!convite) return;
 
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+
+  // já está nesta mesma casa: nada a fazer
+  if (sync.isConfigured() && sync.snapshot().code === convite.code) return;
+
   aplicarConvite(convite, true);
 }
 
@@ -2225,6 +2229,8 @@ async function init(){
     document.addEventListener('fluxo:remote-change', function(){ render(); });
     window.FluxoSync.start();
     conviteDaUrl();
+    // abrir o link do convite com o app já aberto (só muda o #hash) também conecta
+    window.addEventListener('hashchange', conviteDaUrl);
   }
 
   registerServiceWorker();
