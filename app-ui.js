@@ -2065,17 +2065,19 @@ function renderSync(){
   if (!syncInputsFilled && snap.configured) {
     syncInputsFilled = true;
     if (!$('syncCode').value) $('syncCode').value = snap.code;
+  } else if (!snap.configured && !$('syncCode').value && sync.defaultCode) {
+    $('syncCode').value = sync.defaultCode();
   }
 
   const hint = $('syncHint');
   if (snap.status === 'error') {
-    hint.textContent = snap.error + '\n\nConfira o código da casa: ele precisa ser exatamente igual nos dois aparelhos.';
+    hint.textContent = snap.error + '\n\nSe o problema continuar, confira o código da casa e a internet.';
   } else if (conectado) {
-    hint.textContent = 'Código da casa: ' + snap.code + '\nPara usar no outro aparelho, toque em Copiar código e cole lá.';
+    hint.textContent = 'Código da casa: ' + snap.code + '\nAnote este código: ele só é pedido se você reinstalar o app em outro aparelho.';
   } else if (snap.configured) {
-    hint.textContent = 'Código salvo. Toque em Conectar para sincronizar.';
+    hint.textContent = 'Sincronização pronta. Toque em Conectar para ativar.';
   } else {
-    hint.textContent = 'Primeiro aparelho (o que já tem os lançamentos): toque em Gerar código e conecte.\nSegundo aparelho: toque em Colar código (ou digite o mesmo código do primeiro).';
+    hint.textContent = 'Sincronização desligada. Toque em Conectar para religar com o código acima.';
   }
 
   renderSyncChip(snap);
@@ -2294,7 +2296,6 @@ function bindSync(){
     if (!confirm('Desconectar a sincronização? Os dados continuam salvos neste aparelho.')) return;
     await sync.disconnect();
     syncInputsFilled = false;
-    $('syncCode').value = '';
     renderSync();
     toast('Sincronização desligada');
   });

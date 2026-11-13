@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'fluxo-v15';
+const CACHE_NAME = 'fluxo-v16';
 const APP_SHELL = [
   './',
   './index.html',
