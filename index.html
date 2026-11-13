@@ -324,7 +324,7 @@
       <div class="data-grid">
         <div class="card" id="syncCard">
           <h2>Sincronização entre aparelhos</h2>
-          <p class="hint" style="margin-top:8px">Conecte o celular e o computador na mesma “casa” para lançar em um e ver no outro. A sincronização é opcional: sem ela, o app continua salvando tudo neste aparelho.</p>
+          <p class="hint" style="margin-top:8px">Para ver os mesmos lançamentos no notebook e no celular, os dois precisam usar o <strong>mesmo código da casa</strong>. Digite o código em cada aparelho uma única vez. Sem isso, o app continua salvando tudo normalmente, mas cada aparelho fica com os seus dados.</p>
 
           <div class="sync-status" id="syncStatus">
             <span class="sync-dot" id="syncDot"></span>
@@ -333,29 +333,22 @@
 
           <div class="sync-fields" id="syncFields">
             <div class="field">
-              <label for="syncUrl">URL do projeto (Supabase)</label>
-              <input type="url" id="syncUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" spellcheck="false">
-            </div>
-            <div class="field">
-              <label for="syncKey">Chave pública (anon)</label>
-              <input type="password" id="syncKey" placeholder="eyJhbGciOi..." autocomplete="off" spellcheck="false">
-            </div>
-            <div class="field">
               <label for="syncCode">Código da casa</label>
-              <input type="text" id="syncCode" placeholder="ex.: casa-7f3k9q" autocomplete="off" spellcheck="false" maxlength="40">
+              <input type="text" id="syncCode" placeholder="ex.: rafael-casa-2026-9f4k" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off" maxlength="40">
             </div>
           </div>
 
           <div class="data-actions">
             <button class="btn btn-primary" type="button" id="syncConnect">Conectar</button>
             <button class="btn btn-ghost" type="button" id="syncNow" hidden>Sincronizar agora</button>
-            <button class="btn btn-ghost" type="button" id="syncInvite" hidden>Copiar convite</button>
-            <button class="btn btn-ghost" type="button" id="syncPaste">Colar convite</button>
+            <button class="btn btn-ghost" type="button" id="syncInvite" hidden>Copiar código</button>
+            <button class="btn btn-ghost" type="button" id="syncPaste">Colar código</button>
             <button class="btn btn-ghost" type="button" id="syncDisconnect" hidden>Desconectar</button>
             <button class="btn btn-ghost" type="button" id="syncNewCode">Gerar código</button>
           </div>
 
           <p class="hint" id="syncHint" style="margin-top:12px"></p>
+          <p class="hint" style="margin-top:8px">Se algo parecer desatualizado, o app pode estar com uma versão antiga guardada. <button class="link-btn" type="button" id="syncReload">Forçar atualização do app</button></p>
         </div>
 
         <div class="card" id="reportCard">
@@ -409,7 +402,7 @@
         <div class="card">
           <h2>Sobre</h2>
           <div style="margin-top:8px">
-            <div class="about-row"><span>Versão</span><strong>1.7</strong></div>
+            <div class="about-row"><span>Versão</span><strong>1.8</strong></div>
             <div class="about-row"><span>Cartão</span><strong>fatura, limite e 90 dias</strong></div>
             <div class="about-row"><span>Armazenamento</span><strong>local, no aparelho</strong></div>
             <div class="about-row"><span>Sincronização</span><strong>opcional (celular + PC)</strong></div>

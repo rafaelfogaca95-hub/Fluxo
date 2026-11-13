@@ -2058,25 +2058,24 @@ function renderSync(){
   $('syncNow').hidden = !conectado;
   $('syncDisconnect').hidden = !snap.configured;
   $('syncInvite').hidden = !conectado;
-  $('syncPaste').hidden = snap.configured;
+  $('syncPaste').hidden = conectado;
+  $('syncNewCode').hidden = snap.configured;
   $('syncConnect').textContent = snap.status === 'error' ? 'Tentar de novo' : 'Conectar';
 
   if (!syncInputsFilled && snap.configured) {
     syncInputsFilled = true;
-    if (!$('syncUrl').value) $('syncUrl').value = snap.url;
     if (!$('syncCode').value) $('syncCode').value = snap.code;
-    $('syncKey').placeholder = 'chave salva — deixe em branco';
   }
 
   const hint = $('syncHint');
   if (snap.status === 'error') {
-    hint.textContent = snap.error + '\n\nConfira a URL, a chave anon e o código. Os dois aparelhos precisam usar o mesmo código.';
+    hint.textContent = snap.error + '\n\nConfira o código da casa: ele precisa ser exatamente igual nos dois aparelhos.';
   } else if (conectado) {
-    hint.textContent = 'Código da casa: ' + snap.code + '\nPara o outro aparelho, toque em Copiar convite e envie para ele.';
+    hint.textContent = 'Código da casa: ' + snap.code + '\nPara usar no outro aparelho, toque em Copiar código e cole lá.';
   } else if (snap.configured) {
-    hint.textContent = 'Configuração salva. Toque em Conectar para sincronizar.';
+    hint.textContent = 'Código salvo. Toque em Conectar para sincronizar.';
   } else {
-    hint.textContent = 'Primeiro aparelho (o que já tem os lançamentos): toque em Gerar código, preencha a URL e a chave, e conecte.\nSegundo aparelho: toque em Colar convite (recebido do primeiro).';
+    hint.textContent = 'Primeiro aparelho (o que já tem os lançamentos): toque em Gerar código e conecte.\nSegundo aparelho: toque em Colar código (ou digite o mesmo código do primeiro).';
   }
 
   renderSyncChip(snap);
@@ -2158,37 +2157,56 @@ async function aplicarConvite(convite, automatico){
 
   sync.setConfig(convite.url, convite.key, convite.code);
   syncInputsFilled = true;
-  $('syncUrl').value = convite.url;
-  $('syncKey').value = convite.key;
   $('syncCode').value = convite.code;
-  $('syncKey').placeholder = 'chave salva — deixe em branco';
   renderSync();
-  if (!automatico) toast('Convite aplicado — conectando…');
+  if (!automatico) toast('Código aplicado — conectando…');
 
   const ok = await sync.connect();
   if (ok) toast('Sincronização ativada');
 }
 
-/* Convite recebido por link (https://site/#convite=...) */
+/* Código recebido por link (https://site/#casa=...) */
 function conviteDaUrl(){
   const sync = window.FluxoSync;
   if (!sync) return;
 
-  const m = (location.hash || '').match(/convite=([^&\s]+)/);
+  const fonte = (location.hash || '') + '&' + (location.search || '');
+  const m = fonte.match(/(?:convite|casa)=([^&\s]+)/);
   if (!m) return;
 
   let texto = m[1];
   try { texto = decodeURIComponent(m[1]); } catch (e) { /* usa como veio */ }
 
-  const convite = sync.parseInvite(texto);
-  if (!convite) return;
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
 
-  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+  const convite = sync.parseInvite(texto);
+  if (!convite) {
+    irParaSync();
+    $('syncCode').value = texto.slice(0, 40);
+    toast('Código do link não reconhecido. ' + sync.explainInvite(texto));
+    return;
+  }
 
   // já está nesta mesma casa: nada a fazer
   if (sync.isConfigured() && sync.snapshot().code === convite.code) return;
 
   aplicarConvite(convite, true);
+}
+
+/* Limpa cache/service worker e recarrega: resolve app preso em versão antiga (comum no iPhone). */
+async function forcarAtualizacao(){
+  toast('Buscando a versão mais nova…');
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(function(r){ return r.unregister(); }));
+    }
+    if (window.caches && caches.keys) {
+      const nomes = await caches.keys();
+      await Promise.all(nomes.map(function(n){ return caches.delete(n); }));
+    }
+  } catch (e) { /* segue para recarregar */ }
+  location.replace(location.pathname + '?atualizado=' + Date.now());
 }
 
 function bindSync(){
@@ -2210,29 +2228,21 @@ function bindSync(){
   });
 
   $('syncConnect').addEventListener('click', async function(){
-    const url = $('syncUrl').value.trim();
-    const key = $('syncKey').value.trim();
     const code = $('syncCode').value.trim().toLowerCase();
 
-    if (sync.isConfigured() && !key) {
-      await sync.connect();
-      return;
-    }
-
-    if (!/^https:\/\/.+\.supabase\.co$/.test(url)) {
-      toast('Informe a URL do projeto, ex.: https://abc.supabase.co');
-      return;
-    }
-    if (!key) {
-      toast('Informe a chave anon do projeto.');
+    if (!code) {
+      if (sync.isConfigured()) { await sync.connect(); return; }
+      toast('Digite o código da casa.');
+      $('syncCode').focus();
       return;
     }
     if (code.length < 6) {
       toast('O código da casa precisa ter pelo menos 6 caracteres.');
+      $('syncCode').focus();
       return;
     }
 
-    sync.setConfig(url, key, code);
+    sync.setCode(code);
     const ok = await sync.connect();
     if (ok) toast('Sincronização ativada');
   });
@@ -2242,28 +2252,22 @@ function bindSync(){
   });
 
   $('syncInvite').addEventListener('click', async function(){
-    const texto = sync.inviteText();
-    if (!texto) {
-      toast('Conecte primeiro para gerar o convite.');
+    const codigo = sync.inviteText();
+    if (!codigo) {
+      toast('Conecte primeiro para ter um código.');
       return;
     }
-    const link = sync.inviteLink();
-    const podeLink = /^https:\/\//.test(link) && link.indexOf('https://localhost') !== 0;
-    const valor = podeLink ? link : texto;
 
     if (window.FluxoNative && window.FluxoNative.isNative && window.FluxoNative.shareText) {
       try {
-        await window.FluxoNative.shareText(valor, 'Convite do Fluxo');
+        await window.FluxoNative.shareText(codigo, 'Código do Fluxo');
         return;
       } catch (err) { /* segue para copiar */ }
     }
 
-    const copiou = await copyText(valor);
-    if (copiou) {
-      toast(podeLink ? 'Link do convite copiado' : 'Convite copiado');
-    } else {
-      prompt('Copie o convite e envie para o outro aparelho:', valor);
-    }
+    const copiou = await copyText(codigo);
+    if (copiou) toast('Código copiado: cole no outro aparelho');
+    else window.prompt('Código da casa:', codigo);
   });
 
   $('syncPaste').addEventListener('click', async function(){
@@ -2275,27 +2279,22 @@ function bindSync(){
     } catch (err) { texto = ''; }
 
     const convite = sync.parseInvite(texto);
-    if (!convite) {
-      const digitado = prompt('Cole aqui o convite recebido:', texto || '');
-      const alternativo = sync.parseInvite(digitado);
-      if (!alternativo) {
-        toast('Convite inválido ou vazio.');
-        return;
-      }
-      aplicarConvite(alternativo);
+    if (convite) {
+      aplicarConvite(convite);
       return;
     }
-    aplicarConvite(convite);
+
+    if (texto) $('syncCode').value = texto.trim().slice(0, 40);
+    $('syncCode').focus();
+    toast(texto ? sync.explainInvite(texto) : 'Nada copiado. Digite o código da casa.');
   });
+  $('syncReload').addEventListener('click', forcarAtualizacao);
 
   $('syncDisconnect').addEventListener('click', async function(){
     if (!confirm('Desconectar a sincronização? Os dados continuam salvos neste aparelho.')) return;
     await sync.disconnect();
     syncInputsFilled = false;
-    $('syncUrl').value = '';
-    $('syncKey').value = '';
     $('syncCode').value = '';
-    $('syncKey').placeholder = 'eyJhbGciOi...';
     renderSync();
     toast('Sincronização desligada');
   });
