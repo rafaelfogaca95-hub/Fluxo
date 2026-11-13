@@ -359,8 +359,8 @@ function txRowHtml(t, compact){
   const actions = compact ? '' :
     '<div class="tx-actions">' +
       attach +
-      '<button class="mini-btn" type="button" data-action="edit" data-id="' + t.id + '" aria-label="Editar ' + escapeHtml(t.desc) + '">' + icon('edit', 13) + '</button>' +
-      '<button class="mini-btn danger" type="button" data-action="del" data-id="' + t.id + '" aria-label="Excluir ' + escapeHtml(t.desc) + '">' + icon('trash', 13) + '</button>' +
+      '<button class="mini-btn" type="button" data-action="edit" data-id="' + t.id + '" aria-label="Editar ' + escapeHtml(t.desc) + '" title="Editar">' + icon('edit', 13) + '</button>' +
+      '<button class="mini-btn danger" type="button" data-action="del" data-id="' + t.id + '" aria-label="Excluir ' + escapeHtml(t.desc) + '" title="Excluir">' + icon('trash', 13) + '</button>' +
     '</div>';
 
   return '<div class="' + cls + '"' + actionAttr + '>' +
@@ -431,9 +431,12 @@ function renderRecent(){
   }).join('');
 
   if (foot) {
-    foot.hidden = todos.length <= list.length;
+    foot.hidden = false;
     const btn = $('recentSeeAll');
-    if (btn) btn.textContent = 'Ver todos os ' + todos.length;
+    if (btn) {
+      btn.hidden = todos.length <= list.length;
+      btn.textContent = 'Ver todos os ' + todos.length;
+    }
   }
 }
 
@@ -901,6 +904,7 @@ function openModal(tx, preset){
 
   $('modalTitle').textContent = tx ? 'Editar lançamento' : 'Novo lançamento';
   $('m-save').textContent = tx ? 'Salvar alterações' : 'Adicionar';
+  $('m-delete').hidden = !tx;
   $('m-desc').value = tx ? tx.desc : (pre.desc || '');
   $('m-amount').value = tx ? formatAmountInput(tx.amount) : '';
   $('m-date').value = tx ? tx.date : defaultDate();
@@ -931,6 +935,21 @@ function closeModal(){
   editingId = null;
   pendingReceipts = [];
   clearModalUrls();
+}
+
+/* Exclusão usada tanto pelo ícone do extrato quanto pelo botão dentro do modal. */
+function excluirLancamento(tx){
+  if (!tx) return false;
+  const hasRec = receiptCount(tx.id) > 0;
+  const msg = 'Excluir “' + tx.desc + '”?' +
+    (hasRec ? ' O comprovante anexado também será apagado.' : ' Essa ação não pode ser desfeita.');
+  if (!confirm(msg)) return false;
+
+  deleteTransaction(tx.id);
+  if (recStore() && hasRec) recStore().removeByTx(tx.id).catch(function(){});
+  render();
+  toast('Lançamento excluído');
+  return true;
 }
 
 /* ---------- comprovantes ---------- */
@@ -1449,15 +1468,7 @@ function bind(){
 
     if (action === 'del') {
       const tx = state.transactions.find(function(t){ return t.id === id; });
-      if (!tx) return;
-      const hasRec = receiptCount(id) > 0;
-      const msg = 'Excluir “' + tx.desc + '”?' + (hasRec ? ' O comprovante anexado também será apagado.' : ' Essa ação não pode ser desfeita.');
-      if (confirm(msg)) {
-        deleteTransaction(id);
-        if (recStore() && hasRec) recStore().removeByTx(id).catch(function(){});
-        render();
-        toast('Lançamento excluído');
-      }
+      excluirLancamento(tx);
       return;
     }
 
@@ -1558,6 +1569,13 @@ function bind(){
   $('r-amount').addEventListener('blur', function(e){
     const v = parseAmount(e.target.value);
     if (v > 0) e.target.value = formatAmountInput(v);
+  });
+
+  $('m-delete').addEventListener('click', function(){
+    if (!editingId) return;
+    const tx = state.transactions.find(function(t){ return t.id === editingId; });
+    if (!tx) return;
+    if (excluirLancamento(tx)) closeModal();
   });
 
   $('txForm').addEventListener('submit', function(e){
