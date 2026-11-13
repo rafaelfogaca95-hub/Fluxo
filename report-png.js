@@ -33,6 +33,9 @@
   const FONT = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
   const SERIF = '"Fraunces", Georgia, "Times New Roman", serif';
 
+  /* cores das receitas na barra de composição (não dependem da categoria) */
+  const INCOME_COLORS = ['#0F7B5F', '#3F7EA6', '#B08A2E', '#8B6BC4', '#5B8C5A', '#C2556B'];
+
   /* ---------- formatação ---------- */
 
   function money(v){
@@ -109,8 +112,7 @@
       p.ctx.textAlign = 'left';
     };
 
-    p.rect = function(x, y, w, h, r, fill, stroke, lineWidth){
-      if (!p.ctx) return;
+    p.path = function(x, y, w, h, r){
       const c = p.ctx;
       const rr = Math.max(0, Math.min(r || 0, Math.min(w, h) / 2));
       c.beginPath();
@@ -124,8 +126,23 @@
       c.lineTo(x, y + rr);
       c.quadraticCurveTo(x, y, x + rr, y);
       c.closePath();
-      if (fill) { c.fillStyle = fill; c.fill(); }
-      if (stroke) { c.strokeStyle = stroke; c.lineWidth = lineWidth || 1; c.stroke(); }
+    };
+
+    p.rect = function(x, y, w, h, r, fill, stroke, lineWidth){
+      if (!p.ctx) return;
+      p.path(x, y, w, h, r);
+      if (fill) { p.ctx.fillStyle = fill; p.ctx.fill(); }
+      if (stroke) { p.ctx.strokeStyle = stroke; p.ctx.lineWidth = lineWidth || 1; p.ctx.stroke(); }
+    };
+
+    /* desenha dentro de um retângulo arredondado (usado na barra de receitas) */
+    p.clipRound = function(x, y, w, h, r, fn){
+      if (!p.ctx) return;
+      p.ctx.save();
+      p.path(x, y, w, h, r);
+      p.ctx.clip();
+      fn();
+      p.ctx.restore();
     };
 
     p.hline = function(x1, x2, y, color, lw){
@@ -201,6 +218,11 @@
       .sort(function(a, b){ return b.amount - a.amount; })
       .slice(0, 5);
 
+    const incomes = tx.filter(function(t){ return t.type === 'income'; })
+      .sort(function(a, b){
+        return String(a.date).localeCompare(String(b.date)) || b.amount - a.amount;
+      });
+
     const openList = tx.filter(function(t){ return t.type === 'expense' && !t.paid; })
       .sort(function(a, b){ return b.amount - a.amount; });
 
@@ -213,6 +235,7 @@
       incomeCount: incomeCount,
       expenseCount: expenseCount,
       economy: economy,
+      incomes: incomes,
       cats: cats,
       otherCats: otherCats,
       otherTotal: otherTotal,
@@ -301,6 +324,90 @@
     p.text(txt, PAD + 62, p.y + 55, has ? COL.amber : COL.green);
 
     p.y += h;
+  }
+
+  /* painel das receitas: cada entrada separada (pagamento, vale, VA...) */
+  function drawIncome(p, d){
+    if (!d.incomes.length) return;
+
+    const shown = d.incomes.slice(0, 6);
+    const extra = d.incomes.length > shown.length;
+    const hasBar = d.incomes.length > 1;
+
+    const rowsTop = 78;
+    const rowsH = shown.length * 62;
+    const extraH = extra ? 30 : 0;
+    const panelH = rowsTop + rowsH + extraH + (hasBar ? 78 : 10);
+
+    p.y += 44;
+
+    const x = PAD;
+    const w = W - PAD * 2;
+    const ix = x + 50;
+    const ir = x + w - 30;
+
+    p.rect(x, p.y, w, panelH, 24, COL.greenSoft, 'rgba(31,127,85,.18)', 1.5);
+    p.rect(x + 20, p.y + 26, 8, panelH - 52, 4, COL.green);
+
+    p.font(19, 700);
+    p.text('RECEITAS DO MÊS', ix, p.y + 46, COL.green);
+    p.font(26, 700);
+    p.text(money(d.st.income), ir, p.y + 50, COL.green, 'right');
+
+    let ry = p.y + rowsTop;
+
+    shown.forEach(function(t){
+      p.font(22, 600);
+      p.text(p.fit(t.desc, ir - ix - 215), ix, ry + 20, COL.ink);
+
+      p.font(17, 500);
+      p.text(catName(t.category) + ' · ' + dateBr(t.date), ix, ry + 42, COL.muted);
+
+      p.font(22, 700);
+      p.text(money(t.amount), ir, ry + 20, COL.green, 'right');
+
+      ry += 62;
+    });
+
+    if (extra) {
+      p.font(17, 500);
+      p.text('+ ' + (d.incomes.length - shown.length) + ' receitas', ix, ry + 12, COL.muted);
+      ry += 30;
+    }
+
+    if (hasBar) {
+      const barY = ry + 12;
+      const barW = ir - ix;
+      const total = d.st.income || 1;
+
+      p.rect(ix, barY, barW, 14, 7, '#D9EADF');
+      if (p.ctx) {
+        p.clipRound(ix, barY, barW, 14, 7, function(){
+          let bx = ix;
+          shown.forEach(function(t, i){
+            const sw = barW * (t.amount / total);
+            if (sw <= 0) return;
+            p.rect(bx, barY, Math.min(sw, ix + barW - bx), 14, 0, INCOME_COLORS[i % INCOME_COLORS.length]);
+            bx += sw;
+          });
+        });
+      }
+
+      const legendY = barY + 38;
+      let lx = ix;
+      shown.forEach(function(t, i){
+        if (i > 3) return;
+        p.font(16, 500);
+        const label = p.fit(t.desc, 170) + ' ' + pct(t.amount, total);
+        const need = 16 + p.measure(label) + 22;
+        if (lx + need > ir + 6) return;
+        p.dot(lx + 5, legendY - 5, 5, INCOME_COLORS[i % INCOME_COLORS.length]);
+        p.text(label, lx + 15, legendY, COL.muted);
+        lx += need;
+      });
+    }
+
+    p.y += panelH;
   }
 
   function section(p, title, right){
@@ -538,6 +645,7 @@
     if (!d.st.count) {
       drawEmpty(p, d);
     } else {
+      drawIncome(p, d);
       drawCardPanel(p, d);
       drawCategories(p, d);
       drawFixed(p, d);
