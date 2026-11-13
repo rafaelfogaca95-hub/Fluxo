@@ -1,12 +1,13 @@
 'use strict';
 
-const CACHE_NAME = 'fluxo-v17';
+const CACHE_NAME = 'fluxo-v18';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './app-data.js',
   './app-report.js',
+  './report-png.js',
   './app-ui.js',
   './receipts.js',
   './native.js',

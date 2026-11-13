@@ -256,6 +256,23 @@ h1,h2,h3,p{margin:0}
 .open-strip .btn:hover{background:rgba(214,158,46,.12);border-color:rgba(180,120,20,.38)}
 [data-theme="dark"] .open-strip .btn{border-color:rgba(180,120,20,.4)}
 [data-theme="dark"] .open-strip,[data-theme="dark"] .pay-pill,[data-theme="dark"] .sync-chip.syncing,[data-theme="dark"] .sync-banner{color:#F0C674}
+
+/* convite para o relatório em imagem */
+.report-strip{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:15px;padding:13px 16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+.report-strip-txt{min-width:0}
+.report-strip-txt strong{display:block;font-family:'Fraunces',Georgia,serif;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.report-strip-txt span{display:block;margin-top:3px;font-size:11.5px;line-height:1.4;color:var(--muted)}
+.report-strip .btn{flex:0 0 auto}
+.report-strip .btn svg{flex:0 0 auto}
+
+/* prévia do relatório em imagem */
+.report-modal{width:min(640px,100%);max-height:min(94vh,900px);display:flex;flex-direction:column;overflow:hidden}
+.report-preview{flex:1 1 auto;min-height:0;display:grid;place-items:center;padding:10px;margin-bottom:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-2);overflow:auto}
+.report-img{display:block;width:100%;height:auto;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.14);cursor:zoom-in}
+.report-img.zoom{width:230%;max-width:none;cursor:zoom-out}
+.report-hint{margin:0 0 12px;text-align:center;font-size:11px;color:var(--muted)}
+.report-loading{padding:54px 16px;text-align:center;font-size:12px;color:var(--muted)}
+.report-modal .modal-actions{margin-top:0}
 [data-theme="dark"] .sync-banner{background:rgba(214,158,46,.14);border-color:rgba(214,158,46,.32)}
 [data-theme="dark"] .sync-banner .btn{background:var(--surface-2);color:#F0C674;border-color:rgba(214,158,46,.36)}
 
@@ -483,6 +500,10 @@ h1,h2,h3,p{margin:0}
   .filters input{grid-column:1/-1}
   #f-cat{grid-column:auto}
   .open-strip{flex-wrap:wrap;font-size:11.5px}
+  .report-strip{flex-direction:column;align-items:stretch;gap:10px;padding:13px 14px}
+  .report-strip .btn{width:100%;justify-content:center}
+  .report-preview{max-height:56vh}
+  .report-modal{max-height:94vh}
   .form-grid{grid-template-columns:1fr}
   .modal-backdrop{padding:0;align-items:flex-end}
   .modal{border-radius:22px 22px 0 0;max-height:94vh;padding:20px 18px calc(20px + env(safe-area-inset-bottom));width:100%}

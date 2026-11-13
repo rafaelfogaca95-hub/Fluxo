@@ -1513,6 +1513,7 @@ function bind(){
 
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape') {
+      if ($('reportPreview').classList.contains('open')) { fecharPreviewRelatorio(); return; }
       if ($('viewer').classList.contains('open')) { closeReceiptViewer(); return; }
       if ($('modal').classList.contains('open')) { closeModal(); return; }
     }
@@ -2032,6 +2033,120 @@ function bindReport(){
     $('reportHint').textContent = 'Mês escolhido: ' + nome.charAt(0).toUpperCase() + nome.slice(1) +
       '. O relatório do ano usa ' + sel.value.slice(0, 4) + '.';
   });
+
+  const atalho = $('reportPngBtn');
+  if (atalho) atalho.addEventListener('click', function(){ gerarRelatorioPng(viewMonth); });
+
+  const doMes = $('reportPngMonthBtn');
+  if (doMes) doMes.addEventListener('click', function(){
+    const sel = $('reportMonthSelect');
+    gerarRelatorioPng((sel && sel.value) || viewMonth);
+  });
+
+  $('reportSave').addEventListener('click', salvarRelatorioPng);
+
+  $('reportImg').addEventListener('click', function(){
+    this.classList.toggle('zoom');
+  });
+
+  $('reportPreview').addEventListener('click', function(e){
+    if (e.target.id === 'reportPreview' || e.target.closest('[data-report-close]')) {
+      fecharPreviewRelatorio();
+    }
+  });
+}
+
+/* ---------- relatório em imagem (PNG) ---------- */
+
+let reportPngAtual = null;
+
+function abrirPreviewRelatorio(){
+  const el = $('reportPreview');
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+  el.inert = false;
+  document.body.style.overflow = 'hidden';
+
+  const img = $('reportImg');
+  img.hidden = true;
+  img.classList.remove('zoom');
+  img.removeAttribute('src');
+
+  $('reportLoading').hidden = false;
+  $('reportLoading').textContent = 'Montando o resumo…';
+  $('reportSave').disabled = true;
+}
+
+function fecharPreviewRelatorio(){
+  const el = $('reportPreview');
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+  el.inert = true;
+  if (!$('modal').classList.contains('open')) document.body.style.overflow = '';
+}
+
+async function gerarRelatorioPng(mk){
+  if (!window.FluxoReportPng) {
+    toast('O gerador de imagem não carregou. Feche e abra o app.');
+    return;
+  }
+
+  const alvo = mk || viewMonth;
+  abrirPreviewRelatorio();
+
+  // deixa a mensagem "montando" aparecer antes de desenhar
+  await new Promise(function(r){ setTimeout(r, 60); });
+
+  try {
+    if (document.fonts && document.fonts.ready) {
+      try { await document.fonts.ready; } catch (e) { /* segue com a fonte padrão */ }
+    }
+
+    const png = window.FluxoReportPng.month(alvo);
+    reportPngAtual = png;
+
+    $('reportPreviewTitle').textContent = 'Resumo de ' + png.label;
+    $('reportImg').src = png.dataUrl;
+    $('reportImg').hidden = false;
+    $('reportLoading').hidden = true;
+    $('reportSave').disabled = false;
+    $('reportSave').textContent = isNativeApp() ? 'Salvar ou compartilhar' : 'Salvar imagem';
+  } catch (err) {
+    $('reportLoading').textContent = 'Não foi possível montar o resumo. Feche e tente de novo.';
+  }
+}
+
+async function salvarRelatorioPng(){
+  if (!reportPngAtual) return;
+
+  const png = reportPngAtual;
+  const native = window.FluxoNative;
+
+  try {
+    if (native && native.isNative && native.saveFileBase64) {
+      await native.saveFileBase64(png.base64, png.filename);
+      toast('Imagem pronta para salvar ou compartilhar');
+      return;
+    }
+
+    const blob = base64ToBlob(png.base64, 'image/png');
+    const file = new File([blob], png.filename, { type: 'image/png' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Relatório Fluxo', text: png.label });
+        toast('Imagem pronta para salvar ou compartilhar');
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+      }
+    }
+
+    downloadBlob(blob, png.filename);
+    toast('Imagem baixada');
+  } catch (err) {
+    toast('Não foi possível salvar a imagem.');
+  }
 }
 
 /* ---------- sincronização (opcional) ---------- */
@@ -2390,6 +2505,10 @@ async function init(){
   setupInstall();
   if (window.FluxoNative && window.FluxoNative.isNative) {
     window.FluxoNative.onBack(function(){
+      if ($('reportPreview').classList.contains('open')) {
+        fecharPreviewRelatorio();
+        return;
+      }
       if ($('modal').classList.contains('open')) {
         closeModal();
         return;
