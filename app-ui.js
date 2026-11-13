@@ -182,9 +182,9 @@ function renderKpis(){
   const balanceEl = $('kpiBalance');
   balanceEl.className = 'kpi kpi-hero' + (s.balance < 0 ? ' neg' : '');
   balanceEl.innerHTML =
-    '<span class="kpi-label">Saldo do mês</span>' +
+    '<span class="kpi-label">Sobrou no mês</span>' +
     '<span class="kpi-value">' + fmtBRL(s.balance) + '</span>' +
-    '<span class="kpi-note">' + (s.count ? 'entradas menos saídas em ' + monthShort(viewMonth) : 'Adicione seu primeiro lançamento') + '</span>';
+    '<span class="kpi-note">' + (s.count ? 'entradas − despesas de ' + monthShort(viewMonth) : 'Adicione seu primeiro lançamento') + '</span>';
 
   const incomeEl = $('kpiIncome');
   incomeEl.className = 'kpi positive';
@@ -209,13 +209,16 @@ function renderKpis(){
     '<span class="kpi-value">' + fmtBRL(s.expense) + '</span>' +
     '<span class="kpi-note">' + expenseNote + '</span>';
 
-  const rate = s.income > 0 ? (s.balance / s.income) * 100 : 0;
   const rateEl = $('kpiRate');
-  rateEl.className = 'kpi ' + (rate >= 0 ? 'positive' : 'negative');
+  const aberto = Number(s.openExpense) || 0;
+  const abertos = Number(s.openCount) || 0;
+  rateEl.className = 'kpi ' + (aberto > 0 ? 'negative' : 'positive');
   rateEl.innerHTML =
-    '<span class="kpi-label">Taxa de economia</span>' +
-    '<span class="kpi-value">' + Math.round(rate) + '%</span>' +
-    '<span class="kpi-note">' + (s.income > 0 ? 'da renda guardada' : 'sem receitas no mês') + '</span>';
+    '<span class="kpi-label">Em aberto</span>' +
+    '<span class="kpi-value">' + fmtBRL(aberto) + '</span>' +
+    '<span class="kpi-note">' + (abertos > 0
+      ? abertos + (abertos === 1 ? ' despesa a pagar' : ' despesas a pagar')
+      : (s.expense > 0 ? 'tudo pago ✓' : 'nada a pagar')) + '</span>';
 }
 
 /* ---------- render: gráficos ---------- */
@@ -227,13 +230,8 @@ function renderDonut(){
   const legend = $('donutLegend');
 
   if (!total) {
-    wrap.innerHTML =
-      '<svg viewBox="0 0 140 140" class="donut-svg" aria-hidden="true">' +
-      '<circle cx="70" cy="70" r="54" fill="none" stroke="var(--track)" stroke-width="20"/>' +
-      '<text x="70" y="68" text-anchor="middle" class="donut-total">R$ 0</text>' +
-      '<text x="70" y="86" text-anchor="middle" class="donut-sub">sem gastos</text>' +
-      '</svg>';
-    legend.innerHTML = '<p class="hint" style="text-align:center">Nenhuma despesa registrada neste mês.</p>';
+    wrap.innerHTML = '';
+    legend.innerHTML = '<div class="empty" style="padding:18px 8px"><strong>Sem gastos neste mês</strong>Quando você lançar uma despesa, o gráfico mostra onde o dinheiro está indo.</div>';
     $('donutSub').textContent = '0 categorias';
     return;
   }
@@ -369,24 +367,74 @@ function txRowHtml(t, compact){
     '<span class="tx-ic" style="background:' + c.color + '1f;color:' + c.color + '">' + c.icon + '</span>' +
     '<div class="tx-main">' +
       '<div class="tx-title">' +
-        '<span class="tx-desc">' + escapeHtml(t.desc) + '</span>' + tag + status +
+        '<span class="tx-desc">' + escapeHtml(t.desc) + '</span>' + tag + (compact ? status : '') +
       '</div>' +
-      '<div class="tx-meta">' + meta + '</div>' +
+      '<div class="tx-meta">' + (compact ? '' : status) + meta + '</div>' +
     '</div>' +
-    '<span class="tx-amt ' + t.type + '">' + (compact ? '<i class="pay-dot ' + (paid ? 'paid' : 'open') + '"></i>' : '') + (t.type === 'income' ? '+' : '−') + ' ' + fmtBRL(t.amount) + '</span>' +
+    '<span class="tx-amt ' + t.type + '">' + (t.type === 'income' ? '+' : '−') + ' ' + fmtBRL(t.amount) + '</span>' +
     actions +
   '</div>';
 }
 
+const WEEK_SHORT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+function dayTitle(iso){
+  const hoje = todayIso();
+  if (iso === hoje) return 'Hoje · ' + fmtDate(iso);
+  if (iso === addDaysIso(hoje, -1)) return 'Ontem · ' + fmtDate(iso);
+  const d = new Date(iso + 'T12:00:00');
+  return (WEEK_SHORT[d.getDay()] || '') + ' · ' + fmtDate(iso);
+}
+
+function groupByDay(list){
+  const out = [];
+  let atual = null;
+  list.forEach(function(t){
+    if (!atual || atual.date !== t.date) { atual = { date: t.date, items: [] }; out.push(atual); }
+    atual.items.push(t);
+  });
+  return out;
+}
+
+function dayHeadHtml(date, items){
+  const lista = Array.isArray(items) ? items : [];
+  let soma = 0;
+  lista.forEach(function(t){ soma += t.type === 'income' ? t.amount : -t.amount; });
+  const resumo = Math.abs(soma) > 0.004
+    ? (soma > 0 ? '+' : '−') + ' ' + fmtBRL(Math.abs(soma))
+    : '';
+  return '<div class="day-head"><span>' + dayTitle(date) + '</span>' +
+    '<span class="day-sum">' + resumo + '</span></div>';
+}
+
 function renderRecent(){
-  const list = sortedTx(txByMonth(viewMonth)).slice(0, 5);
+  const todos = sortedTx(txByMonth(viewMonth));
   const box = $('recentBox');
-  if (!list.length) {
+  const foot = $('recentFoot');
+  const sub = $('recentSub');
+
+  if (!todos.length) {
+    if (sub) sub.textContent = '';
+    if (foot) foot.hidden = true;
     box.innerHTML = '<div class="empty"><strong>Nada por aqui ainda</strong>Registre uma despesa ou receita para começar.' +
       '<button class="btn btn-primary btn-sm" type="button" data-action="new">Adicionar lançamento</button></div>';
     return;
   }
-  box.innerHTML = list.map(function(t){ return txRowHtml(t, true); }).join('');
+
+  const list = todos.slice(0, 6);
+  if (sub) sub.textContent = todos.length + (todos.length === 1 ? ' lançamento' : ' lançamentos');
+
+  const grupos = groupByDay(list);
+  const comDia = grupos.length > 1;
+  box.innerHTML = grupos.map(function(g){
+    return (comDia ? dayHeadHtml(g.date, g.items) : '') + g.items.map(function(t){ return txRowHtml(t, true); }).join('');
+  }).join('');
+
+  if (foot) {
+    foot.hidden = todos.length <= list.length;
+    const btn = $('recentSeeAll');
+    if (btn) btn.textContent = 'Ver todos os ' + todos.length;
+  }
 }
 
 function renderPending(){
@@ -483,7 +531,11 @@ function renderTransactions(){
       '</div>';
     return;
   }
-  box.innerHTML = list.map(function(t){ return txRowHtml(t, false); }).join('');
+  const grupos = groupByDay(list);
+  const comDia = grupos.length > 1;
+  box.innerHTML = grupos.map(function(g){
+    return (comDia ? dayHeadHtml(g.date, g.items) : '') + g.items.map(function(t){ return txRowHtml(t, false); }).join('');
+  }).join('');
 }
 
 function renderBudgets(){
@@ -2026,6 +2078,53 @@ function renderSync(){
   } else {
     hint.textContent = 'Primeiro aparelho (o que já tem os lançamentos): toque em Gerar código, preencha a URL e a chave, e conecte.\nSegundo aparelho: toque em Colar convite (recebido do primeiro).';
   }
+
+  renderSyncChip(snap);
+}
+
+/* Chip do topo + faixa de aviso: o usuário nunca fica sem saber se está sincronizado. */
+function renderSyncChip(snap){
+  const chip = $('syncChip');
+  const texto = $('syncChipText');
+  if (!chip || !texto) return;
+
+  chip.classList.remove('online', 'syncing', 'error');
+  let rotulo = 'Só neste aparelho';
+  let titulo = 'Sincronização desligada. Toque para conectar este aparelho.';
+
+  if (snap.status === 'online') {
+    chip.classList.add('online');
+    rotulo = 'Sincronizado';
+    titulo = 'Tudo sincronizado' + (snap.lastSync ? ' às ' + syncTime(snap.lastSync) : '') + '. Toque para atualizar agora.';
+  } else if (snap.status === 'syncing' || snap.status === 'connecting') {
+    chip.classList.add('syncing');
+    rotulo = 'Sincronizando…';
+    titulo = 'Enviando e recebendo alterações…';
+  } else if (snap.status === 'error') {
+    chip.classList.add('error');
+    rotulo = 'Sem sincronizar';
+    titulo = snap.error || 'Erro ao sincronizar. Toque para tentar de novo.';
+  }
+
+  texto.textContent = rotulo;
+  chip.title = titulo;
+
+  const banner = $('syncBanner');
+  if (!banner) return;
+
+  const dispensado = banner.dataset.dismissed === '1';
+  const mostrar = (!snap.configured || snap.status === 'error') && !dispensado;
+  banner.hidden = !mostrar;
+  if (!mostrar) return;
+
+  banner.classList.toggle('error', snap.status === 'error');
+  $('syncBannerTitle').textContent = snap.status === 'error'
+    ? 'Não consegui sincronizar'
+    : 'Este aparelho não está sincronizando';
+  $('syncBannerText').textContent = snap.status === 'error'
+    ? (snap.error || 'Confira a internet e tente de novo.')
+    : 'Os lançamentos feitos aqui não aparecem no outro aparelho.';
+  $('syncBannerBtn').textContent = snap.status === 'error' ? 'Tentar de novo' : 'Conectar';
 }
 
 async function copyText(texto){
@@ -2200,6 +2299,42 @@ function bindSync(){
     renderSync();
     toast('Sincronização desligada');
   });
+
+  $('syncChip').addEventListener('click', function(){
+    if (!sync.isConfigured()) { irParaSync(); return; }
+    if (sync.snapshot().status === 'error') { sync.connect(); return; }
+    toast('Atualizando…');
+    sync.syncNow().then(function(ok){
+      render();
+      toast(ok ? 'Tudo atualizado' : 'Não consegui atualizar agora');
+    });
+  });
+
+  $('syncBannerBtn').addEventListener('click', function(){
+    if (sync.isConfigured()) { sync.connect(); return; }
+    irParaSync();
+  });
+
+  $('syncBannerClose').addEventListener('click', function(){
+    const banner = $('syncBanner');
+    banner.dataset.dismissed = '1';
+    banner.hidden = true;
+  });
+}
+
+/* Leva o usuário direto ao cartão de sincronização, com destaque. */
+function irParaSync(){
+  switchTab('dados');
+  const card = $('syncCard');
+  if (!card) return;
+  try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { card.scrollIntoView(); }
+  card.classList.remove('flash');
+  void card.offsetWidth;
+  card.classList.add('flash');
+  const alvo = $('syncPaste');
+  if (alvo && !alvo.hidden) {
+    try { alvo.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+  }
 }
 
 /* ---------- init ---------- */

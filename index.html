@@ -72,7 +72,22 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
     </div>
-    <button class="btn btn-ghost btn-sm" type="button" id="todayBtn">Hoje</button>
+    <div class="month-actions">
+      <button class="btn btn-ghost btn-sm" type="button" id="todayBtn">Hoje</button>
+      <button class="sync-chip" type="button" id="syncChip" aria-live="polite">
+        <span class="sync-chip-dot"></span>
+        <span class="sync-chip-text" id="syncChipText">Verificando…</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sync-banner" id="syncBanner" hidden>
+    <div class="sync-banner-main">
+      <strong id="syncBannerTitle">Este aparelho não está sincronizando</strong>
+      <span id="syncBannerText">Os lançamentos ficam só aqui e não aparecem no outro aparelho.</span>
+    </div>
+    <button class="btn btn-sm" type="button" id="syncBannerBtn">Conectar</button>
+    <button class="sync-banner-close" type="button" id="syncBannerClose" aria-label="Fechar aviso">×</button>
   </div>
 
   <main>
@@ -108,6 +123,27 @@
       <div class="grid-2">
         <div class="card">
           <div class="card-head">
+            <h2>Lançamentos do mês</h2>
+            <span class="card-sub" id="recentSub"></span>
+          </div>
+          <div id="recentBox"></div>
+          <div class="card-foot" id="recentFoot" hidden>
+            <button class="btn btn-ghost btn-sm" type="button" data-goto="lancamentos" id="recentSeeAll">Ver todos</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Contas fixas do mês</h2>
+            <span class="card-sub" id="pendingSub"></span>
+          </div>
+          <div id="pendingBox"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
             <h2>Gastos por categoria</h2>
             <span class="card-sub" id="donutSub"></span>
           </div>
@@ -126,24 +162,6 @@
             <span><i class="dot" style="background:var(--out)"></i>Saídas</span>
           </div>
           <div id="goalBox"></div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-head">
-            <h2>Contas fixas do mês</h2>
-            <span class="card-sub" id="pendingSub"></span>
-          </div>
-          <div id="pendingBox"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <h2>Movimentações recentes</h2>
-            <button class="btn btn-ghost btn-sm" type="button" data-goto="lancamentos">Ver todas</button>
-          </div>
-          <div id="recentBox"></div>
         </div>
       </div>
     </section>
@@ -391,7 +409,7 @@
         <div class="card">
           <h2>Sobre</h2>
           <div style="margin-top:8px">
-            <div class="about-row"><span>Versão</span><strong>1.6</strong></div>
+            <div class="about-row"><span>Versão</span><strong>1.7</strong></div>
             <div class="about-row"><span>Cartão</span><strong>fatura, limite e 90 dias</strong></div>
             <div class="about-row"><span>Armazenamento</span><strong>local, no aparelho</strong></div>
             <div class="about-row"><span>Sincronização</span><strong>opcional (celular + PC)</strong></div>
