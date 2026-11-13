@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const CACHE_NAME = 'fluxo-v13';
 const APP_SHELL = [
