@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F7B5F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Fluxo">
+<meta name="description" content="Fluxo — controle de gastos pessoal simples, offline e instalável no celular.">
+<title>Fluxo — Controle de Gastos Pessoal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+(function(){
+  try{
+    var raw = localStorage.getItem('fluxo.financas.v1');
+    var t = raw ? (JSON.parse(raw).settings || {}).theme : null;
+    var dark = t === 'dark' || ((!t || t === 'auto') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }catch(e){}
+})();
+</script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="mark">F</div>
+      <div>
+        <h1>Fluxo</h1>
+        <p>controle de gastos pessoal</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="Alternar tema claro e escuro" title="Alternar tema"></button>
+      <button class="btn btn-primary" type="button" data-action="new" id="newBtn">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="lbl">Nova transação</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Seções do app">
+    <button class="tab active" type="button" role="tab" id="tab-overview" data-tab="overview" aria-controls="view-overview" aria-selected="true"><span class="long">Visão geral</span><span class="short">Geral</span></button>
+    <button class="tab" type="button" role="tab" id="tab-lancamentos" data-tab="lancamentos" aria-controls="view-lancamentos" aria-selected="false"><span class="long">Lançamentos</span><span class="short">Extrato</span></button>
+    <button class="tab" type="button" role="tab" id="tab-orcamento" data-tab="orcamento" aria-controls="view-orcamento" aria-selected="false">Orçamento</button>
+    <button class="tab" type="button" role="tab" id="tab-cartao" data-tab="cartao" aria-controls="view-cartao" aria-selected="false">Cartão</button>
+    <button class="tab" type="button" role="tab" id="tab-fixos" data-tab="fixos" aria-controls="view-fixos" aria-selected="false"><span class="long">Contas fixas</span><span class="short">Fixas</span></button>
+    <button class="tab" type="button" role="tab" id="tab-dados" data-tab="dados" aria-controls="view-dados" aria-selected="false">Dados</button>
+  </nav>
+
+  <div class="monthbar" id="monthBar">
+    <div class="month-nav">
+      <button class="icon-btn small" type="button" id="prevMonth" aria-label="Mês anterior">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="month-title">
+        <strong id="monthLabel">—</strong>
+        <span id="monthSub"></span>
+      </div>
+      <button class="icon-btn small" type="button" id="nextMonth" aria-label="Próximo mês">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+    <button class="btn btn-ghost btn-sm" type="button" id="todayBtn">Hoje</button>
+  </div>
+
+  <main>
+    <!-- ===================== VISÃO GERAL ===================== -->
+    <section class="view" id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
+      <div class="card quick-card">
+        <form id="quickForm" autocomplete="off">
+          <div class="quick-top">
+            <div class="quick-type" role="group" aria-label="Tipo do lançamento">
+              <button type="button" id="qTypeExpense" aria-pressed="true">Despesa</button>
+              <button type="button" id="qTypeIncome" aria-pressed="false">Receita</button>
+            </div>
+            <select class="quick-field" data-select id="q-cat" aria-label="Categoria"></select>
+            <select class="quick-field" data-select id="q-method" aria-label="Forma de pagamento"></select>
+          </div>
+          <div class="quick-main">
+            <input class="quick-field" id="q-desc" type="text" placeholder="Descrição" maxlength="80" aria-label="Descrição" enterkeyhint="next">
+            <input class="quick-field" id="q-amount" type="text" inputmode="decimal" placeholder="R$ 0,00" aria-label="Valor">
+            <button class="btn btn-primary" type="submit" id="qAdd">Lançar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi kpi-hero" id="kpiBalance"></div>
+        <div class="kpi" id="kpiIncome"></div>
+        <div class="kpi" id="kpiExpense"></div>
+        <div class="kpi" id="kpiRate"></div>
+      </div>
+
+      <div class="open-strip" id="openStrip" hidden></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <h2>Gastos por categoria</h2>
+            <span class="card-sub" id="donutSub"></span>
+          </div>
+          <div class="donut-wrap" id="donut"></div>
+          <div class="legend" id="donutLegend"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Últimos 6 meses</h2>
+            <span class="card-sub">entradas × saídas</span>
+          </div>
+          <div class="trend" id="trend"></div>
+          <div class="trend-legend">
+            <span><i class="dot" style="background:var(--in)"></i>Entradas</span>
+            <span><i class="dot" style="background:var(--out)"></i>Saídas</span>
+          </div>
+          <div id="goalBox"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <h2>Contas fixas do mês</h2>
+            <span class="card-sub" id="pendingSub"></span>
+          </div>
+          <div id="pendingBox"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Movimentações recentes</h2>
+            <button class="btn btn-ghost btn-sm" type="button" data-goto="lancamentos">Ver todas</button>
+          </div>
+          <div id="recentBox"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== LANÇAMENTOS ===================== -->
+    <section class="view" id="view-lancamentos" role="tabpanel" aria-labelledby="tab-lancamentos" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Lançamentos do mês</h2>
+          <button class="btn btn-primary btn-sm" type="button" data-action="new">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Adicionar
+          </button>
+        </div>
+
+        <div class="filters">
+          <input type="search" id="f-q" placeholder="Buscar descrição…" aria-label="Buscar lançamento">
+          <select id="f-type" aria-label="Filtrar por tipo">
+            <option value="">Tudo</option>
+            <option value="expense">Despesas</option>
+            <option value="income">Receitas</option>
+          </select>
+          <select id="f-status" aria-label="Filtrar por situação">
+            <option value="">Situação</option>
+            <option value="open">Em aberto</option>
+            <option value="paid">Pagos / recebidos</option>
+          </select>
+          <select id="f-cat" aria-label="Filtrar por categoria"></select>
+        </div>
+
+        <div class="list-head">
+          <span id="txCount">0 lançamentos</span>
+          <strong id="txTotal"></strong>
+        </div>
+        <div id="txList"></div>
+      </div>
+    </section>
+
+    <!-- ===================== ORÇAMENTO ===================== -->
+    <section class="view" id="view-orcamento" role="tabpanel" aria-labelledby="tab-orcamento" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Orçamento por categoria</h2>
+          <span class="card-sub">limite mensal</span>
+        </div>
+        <div class="budget-summary" id="budgetSummary"></div>
+        <div id="budgetList"></div>
+        <p class="hint" style="margin-top:14px">Os limites são fixos para todos os meses. Deixe em branco para não limitar uma categoria. O valor gasto considera os lançamentos do mês selecionado.</p>
+      </div>
+    </section>
+
+    <!-- ===================== CARTÃO ===================== -->
+    <section class="view" id="view-cartao" role="tabpanel" aria-labelledby="tab-cartao" hidden>
+      <div class="card" id="cardSetup" hidden>
+        <div class="card-head">
+          <h2>Seu cartão</h2>
+          <span class="card-sub">fatura e limite</span>
+        </div>
+        <form class="form-grid" id="cardForm">
+          <div class="field full">
+            <label for="c-name">Nome do cartão</label>
+            <input type="text" id="c-name" maxlength="40" placeholder="Ex.: Carrefour" required>
+          </div>
+          <div class="field">
+            <label for="c-limit">Limite (R$)</label>
+            <input type="text" id="c-limit" inputmode="decimal" placeholder="0,00">
+          </div>
+          <div class="field">
+            <label for="c-alert">Alerta de uso (%)</label>
+            <input type="number" id="c-alert" min="50" max="100" step="5" value="80" required>
+          </div>
+          <div class="field">
+            <label for="c-closing">Dia do fechamento</label>
+            <input type="number" id="c-closing" min="1" max="31" value="30" required>
+          </div>
+          <div class="field">
+            <label for="c-due">Dia do vencimento</label>
+            <input type="number" id="c-due" min="1" max="31" value="5" required>
+          </div>
+          <div class="field full card-form-actions">
+            <button class="btn btn-primary" type="submit">Salvar cartão</button>
+            <button class="btn btn-ghost" type="button" id="c-cancel" data-action="card-cancel" hidden>Cancelar</button>
+          </div>
+        </form>
+        <p class="hint" style="margin-top:10px">Fechamento e vencimento estão na fatura, no app do banco. Ex.: fecha dia 30, vence dia 5. O alerta avisa quando o limite comprometido passar dessa porcentagem.</p>
+      </div>
+
+      <div id="cardMain" hidden>
+        <div class="card card-hero" id="cardHero"></div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-head">
+            <h2>Compras da fatura</h2>
+            <span class="card-sub" id="cardInvoiceSub"></span>
+          </div>
+          <div id="cardList"></div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-head">
+            <h2>Assinaturas no cartão</h2>
+            <span class="card-sub" id="cardFixedTotal"></span>
+          </div>
+          <div id="cardFixedList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CONTAS FIXAS ===================== -->
+    <section class="view" id="view-fixos" role="tabpanel" aria-labelledby="tab-fixos" hidden>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-head">
+          <h2>Nova conta fixa</h2>
+          <span class="card-sub">repete todo mês</span>
+        </div>
+        <form class="rec-form" id="recForm">
+          <div class="field desc">
+            <label for="r-desc">Descrição</label>
+            <input type="text" id="r-desc" maxlength="60" placeholder="Ex.: Aluguel" required>
+          </div>
+          <div class="field">
+            <label for="r-type">Tipo</label>
+            <select id="r-type">
+              <option value="expense">Despesa</option>
+              <option value="income">Receita</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="r-cat">Categoria</label>
+            <select id="r-cat"></select>
+          </div>
+          <div class="field">
+            <label for="r-method">Forma</label>
+            <select id="r-method"></select>
+          </div>
+          <div class="field">
+            <label for="r-amount">Valor (R$)</label>
+            <input type="text" id="r-amount" inputmode="decimal" placeholder="0,00" required>
+          </div>
+          <div class="field">
+            <label for="r-day">Dia</label>
+            <input type="number" id="r-day" min="1" max="31" value="5" required>
+          </div>
+          <button class="btn btn-primary" type="submit">Adicionar</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Contas cadastradas</h2>
+          <span class="card-sub" id="recCount"></span>
+        </div>
+        <p class="hint" style="margin-bottom:10px">Contas fixas não entram no total automaticamente: use <strong>Lançar</strong> para registrar a conta no mês. Assim você evita contar duas vezes.</p>
+        <div id="recList"></div>
+      </div>
+    </section>
+
+    <!-- ===================== DADOS ===================== -->
+    <section class="view" id="view-dados" role="tabpanel" aria-labelledby="tab-dados" hidden>
+      <div class="data-grid">
+        <div class="card" id="syncCard">
+          <h2>Sincronização entre aparelhos</h2>
+          <p class="hint" style="margin-top:8px">Conecte o celular e o computador na mesma “casa” para lançar em um e ver no outro. A sincronização é opcional: sem ela, o app continua salvando tudo neste aparelho.</p>
+
+          <div class="sync-status" id="syncStatus">
+            <span class="sync-dot" id="syncDot"></span>
+            <span id="syncStatusText">Sincronização desativada</span>
+          </div>
+
+          <div class="sync-fields" id="syncFields">
+            <div class="field">
+              <label for="syncUrl">URL do projeto (Supabase)</label>
+              <input type="url" id="syncUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="syncKey">Chave pública (anon)</label>
+              <input type="password" id="syncKey" placeholder="eyJhbGciOi..." autocomplete="off" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="syncCode">Código da casa</label>
+              <input type="text" id="syncCode" placeholder="ex.: casa-7f3k9q" autocomplete="off" spellcheck="false" maxlength="40">
+            </div>
+          </div>
+
+          <div class="data-actions">
+            <button class="btn btn-primary" type="button" id="syncConnect">Conectar</button>
+            <button class="btn btn-ghost" type="button" id="syncNow" hidden>Sincronizar agora</button>
+            <button class="btn btn-ghost" type="button" id="syncInvite" hidden>Copiar convite</button>
+            <button class="btn btn-ghost" type="button" id="syncPaste">Colar convite</button>
+            <button class="btn btn-ghost" type="button" id="syncDisconnect" hidden>Desconectar</button>
+            <button class="btn btn-ghost" type="button" id="syncNewCode">Gerar código</button>
+          </div>
+
+          <p class="hint" id="syncHint" style="margin-top:12px"></p>
+        </div>
+
+        <div class="card" id="reportCard">
+          <h2>Relatório de gastos</h2>
+          <p class="hint" style="margin-top:8px">Gera um PDF com resumo do período, gastos por categoria, contas fixas e todos os lançamentos. Depois é só salvar, imprimir ou enviar no WhatsApp.</p>
+
+          <div class="field" style="margin-top:14px">
+            <label for="reportMonthSelect">Mês do relatório</label>
+            <select id="reportMonthSelect"></select>
+          </div>
+
+          <div class="data-actions">
+            <button class="btn btn-primary" type="button" id="reportMonthBtn">Gerar relatório do mês (PDF)</button>
+            <button class="btn btn-ghost" type="button" id="reportYearBtn">Gerar relatório do ano (PDF)</button>
+          </div>
+
+          <p class="hint" id="reportHint" style="margin-top:12px">O relatório do ano usa o ano do mês escolhido.</p>
+        </div>
+
+        <div class="card">
+          <h2>Backup e exportação</h2>
+          <p class="hint" style="margin-top:8px">Seus dados ficam salvos neste aparelho. Exporte um backup antes de trocar de celular, limpar o navegador ou desinstalar o app.</p>
+          <p class="hint" style="margin-top:6px">Os comprovantes anexados ficam só no aparelho e <strong>não entram no backup .json</strong> — assim o arquivo continua leve para enviar por WhatsApp.</p>
+          <div class="data-actions">
+            <button class="btn btn-primary" type="button" id="exportJson">Baixar backup (.json)</button>
+            <button class="btn btn-ghost" type="button" id="exportCsv">Exportar planilha (.csv)</button>
+            <button class="btn btn-ghost" type="button" id="importBtn">Restaurar backup (.json)</button>
+            <input type="file" id="importFile" accept="application/json,.json" hidden>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Exemplos e limpeza</h2>
+          <p class="hint" style="margin-top:8px">Quer ver como o app fica com dados? Carregue exemplos de 5 meses. Isso substitui os dados atuais.</p>
+          <div class="data-actions">
+            <button class="btn btn-ghost" type="button" id="demoBtn">Carregar dados de exemplo</button>
+            <button class="btn btn-danger" type="button" id="resetBtn">Apagar todos os dados</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Instalar no celular</h2>
+          <p class="hint" style="margin-top:8px">Este app funciona como PWA: pode ser instalado na tela inicial e aberto sem internet.</p>
+          <div class="data-actions">
+            <button class="btn btn-primary" type="button" id="installBtn" hidden>Instalar aplicativo</button>
+          </div>
+          <p class="hint" style="margin-top:10px"><strong>Android:</strong> Chrome → menu ⋮ → “Instalar app”.<br><strong>iPhone:</strong> Safari → botão Compartilhar → “Adicionar à Tela de Início”.</p>
+          <p class="hint" style="margin-top:6px">A instalação completa exige o app publicado em HTTPS (ou aberto em <em>localhost</em>).</p>
+        </div>
+
+        <div class="card">
+          <h2>Sobre</h2>
+          <div style="margin-top:8px">
+            <div class="about-row"><span>Versão</span><strong>1.5</strong></div>
+            <div class="about-row"><span>Cartão</span><strong>fatura, limite e 90 dias</strong></div>
+            <div class="about-row"><span>Armazenamento</span><strong>local, no aparelho</strong></div>
+            <div class="about-row"><span>Sincronização</span><strong>opcional (celular + PC)</strong></div>
+            <div class="about-row"><span>Comprovantes</span><strong>fotos e PDFs no aparelho</strong></div>
+            <div class="about-row"><span>Relatórios</span><strong>PDF do mês e do ano</strong></div>
+            <div class="about-row"><span>Moeda</span><strong>Real (R$)</strong></div>
+          </div>
+          <p class="hint" style="margin-top:12px">Feito para uso pessoal: registre gastos e receitas, defina orçamentos e acompanhe a evolução mês a mês.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer class="footer">
+  Fluxo · dados salvos neste aparelho · faça backups na aba <a href="#" data-goto="dados">Dados</a>
+</footer>
+
+<!-- ===================== MODAL ===================== -->
+<div class="modal-backdrop" id="modal" aria-hidden="true" inert>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h2 id="modalTitle">Novo lançamento</h2>
+      <button class="icon-btn small" type="button" data-close aria-label="Fechar">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <form id="txForm" autocomplete="off">
+      <div class="type-toggle" role="group" aria-label="Tipo de lançamento">
+        <button class="type-btn active" type="button" id="typeExpense" aria-pressed="true">Despesa</button>
+        <button class="type-btn" type="button" id="typeIncome" aria-pressed="false">Receita</button>
+      </div>
+
+      <div class="pay-toggle">
+        <div class="pay-toggle-txt">
+          <strong id="m-paidLabel">Já foi pago</strong>
+          <span id="m-paidHint">Fica verde no extrato</span>
+        </div>
+        <button class="switch" type="button" id="m-paid" role="switch" aria-checked="false" aria-label="Marcar como pago"></button>
+      </div>
+
+      <div class="field">
+        <label for="m-desc">Descrição</label>
+        <input type="text" id="m-desc" maxlength="80" placeholder="Ex.: Supermercado" required>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="m-cat">Categoria</label>
+          <select id="m-cat"></select>
+        </div>
+        <div class="field">
+          <label for="m-method">Forma de pagamento</label>
+          <select id="m-method"></select>
+        </div>
+        <div class="field">
+          <label for="m-amount">Valor (R$)</label>
+          <input type="text" id="m-amount" inputmode="decimal" placeholder="0,00" required>
+        </div>
+        <div class="field">
+          <label for="m-date">Data</label>
+          <input type="date" id="m-date" required>
+        </div>
+        <div class="field full">
+          <label for="m-note">Observação <span class="opt">(opcional)</span></label>
+          <input type="text" id="m-note" maxlength="120" placeholder="Ex.: compra do mês">
+        </div>
+        <div class="field full" id="m-cardFields" hidden>
+          <div class="card-mini">
+            <div class="card-mini-head">
+              <strong id="m-cardName">Cartão</strong>
+              <span id="m-cardHint"></span>
+            </div>
+            <div class="card-mini-row" id="m-deferRow">
+              <div class="card-mini-label">
+                <strong>⛽ Combustível no Carrefour</strong>
+                <span>Pagar em 90 dias</span>
+              </div>
+              <button class="switch" type="button" id="m-defer" role="switch" aria-checked="false" aria-label="Pagar o combustível em 90 dias"></button>
+            </div>
+            <div class="field" id="m-installmentsField">
+              <label for="m-installments">Parcelas</label>
+              <select id="m-installments"></select>
+            </div>
+            <p class="hint" id="m-cardNote" style="margin-top:8px"></p>
+          </div>
+        </div>
+        <p class="hint" id="m-cardWarn" hidden>Nenhum cartão configurado. Cadastre em <strong>Cartão</strong> para lançar no crédito.</p>
+        <div class="field full">
+          <label>Comprovante <span class="opt">(opcional)</span></label>
+          <div class="receipt-list" id="m-receipts"></div>
+          <button class="btn btn-ghost btn-sm receipt-add" type="button" id="m-attach">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.6l8.49-8.48"/></svg>
+            Anexar foto ou PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+        <button class="btn btn-primary" type="submit" id="m-save">Adicionar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== COMPROVANTES ===================== -->
+<div class="modal-backdrop" id="viewer" aria-hidden="true" inert>
+  <div class="modal viewer-modal" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+    <div class="modal-head">
+      <h2 id="viewerTitle">Comprovantes</h2>
+      <button class="icon-btn small" type="button" data-viewer-close aria-label="Fechar">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="viewerBody"></div>
+    <div class="modal-actions" id="viewerActions"></div>
+  </div>
+</div>
+
+<input type="file" id="attachInput" accept="image/*,application/pdf" multiple hidden>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app-data.js"></script>
+<script src="receipts.js"></script>
+<script src="native.js"></script>
+<script src="report.js"></script>
+<script src="app-report.js"></script>
+<script src="sync.js"></script>
+<script src="app-ui.js"></script>
+</body>
+</html>
